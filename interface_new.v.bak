@@ -1,0 +1,237 @@
+module interface_new(vga_CLK, ready, pos_H, pos_V, RGB,POS_SYMBOL,TURN, tr_mov_count, cr_mov_count, tr_win_count, cr_win_count, tr_recent, cr_recent, delete,last_turn);			
+  
+
+input[7:0] POS_SYMBOL;
+reg[3:0] column,row;
+input vga_CLK, ready;								//In order to reduce both the compilation time and the
+input[9:0] pos_H, pos_V;	
+
+input [3:0] tr_mov_count, cr_mov_count;
+input [1:0] tr_win_count, cr_win_count;
+input [7:0] tr_recent, cr_recent;
+input [8:0] delete;
+input last_turn;
+
+//state variables
+parameter triangle_turn = 'd0;
+parameter circle_turn = 'd1;
+parameter idle = 'd2;
+parameter win_tour = 'd3;
+parameter final = 'd4;
+
+input[2:0] TURN ;
+reg last_turn;
+
+
+output reg[11:0] RGB;
+//output reg[23:0] RGB;
+
+parameter width = 320;								//Width of the interface image
+parameter grid_width = 16;
+reg[11:0] ImageData[76799:0];		            //320x240 = 76800 pixels, each has 12 bits (RGB444)
+//reg[23:0] ImageData[76799:0];		            //320x240 = 76800 pixels, each has 24 bits (RGB888)
+reg[11:0] filled_circle_big[1155:0];					//34x34  pixels
+reg[11:0] filled_triangle_big[1155:0];					//34x34  pixels
+reg[11:0] empty_circle_big[1155:0];					//34x34  pixels
+reg[11:0] empty_triangle_big[1155:0];					//34x34  pixels
+
+reg[11:0] triangle_won[20303:0];					//24*96  pixels triangele won message
+reg[11:0] circle_won[20303:0];					//24*96  pixels circle won message
+reg[11:0] invalid_move[20303:0];					//24*96  pixels invalid_move message
+
+reg[11:0] filled_circle[99:0];					//120x120 = 12400 pixels
+reg[11:0] filled_triangle[99:0];					//120x120 = 12400 pixels
+
+reg[11:0] zero[99:0];					//120x120 = 12400 pixels
+reg[11:0] one[99:0];					//120x120 = 12400 pixels
+reg[11:0] two[99:0];					//120x120 = 12400 pixels
+reg[11:0] three[99:0];					//120x120 = 12400 pixels
+reg[11:0] four[99:0];					//120x120 = 12400 pixels
+reg[11:0] five[99:0];					//120x120 = 12400 pixels
+reg[11:0] six[99:0];					//120x120 = 12400 pixels
+reg[11:0] seven[99:0];					//120x120 = 12400 pixels
+reg[11:0] eight[99:0];					//120x120 = 12400 pixels
+reg[11:0] nine[99:0];					//120x120 = 12400 pixels
+
+reg[11:0] letter_A[99:0];					//120x120 = 12400 pixels
+reg[11:0] letter_B[99:0];					//120x120 = 12400 pixels
+reg[11:0] letter_C[99:0];					//120x120 = 12400 pixels
+reg[11:0] letter_D[99:0];					//120x120 = 12400 pixels
+reg[11:0] letter_E[99:0];					//120x120 = 12400 pixels
+reg[11:0] letter_F[99:0];					//120x120 = 12400 pixels
+reg[11:0] letter_G[99:0];					//120x120 = 12400 pixels
+reg[11:0] letter_H[99:0];					//120x120 = 12400 pixels
+reg[11:0] letter_I[99:0];					//120x120 = 12400 pixels
+reg[11:0] letter_J[99:0];					//120x120 = 12400 pixels
+
+
+reg loop_H, loop_V, white;
+reg[16:0] count_data, count_start, data1;		//Counters for double scaling of the	interface image
+reg[13:0] data2;
+reg[8:0] x, y;
+reg[4:0] check;
+
+initial begin																		
+	count_data = 0;								   
+	count_start = 0;
+	loop_H = 0;
+	loop_V = 0;
+	x = 0;
+	y = 0;
+	data1 = 0;
+	data2 = 0;
+	white = 0;
+	check = 0;
+end
+
+initial begin
+	$readmemh("ui_txt/interface/interface.txt", ImageData);								//RGB444 binary data of the interface image
+	$readmemh("ui_txt/numbers/zero.txt",zero);						//Read a number
+	$readmemh("ui_txt/numbers/one.txt",one);						//Read a number
+	$readmemh("ui_txt/numbers/two.txt",two);						//Read a number
+	$readmemh("ui_txt/numbers/three.txt",three);						//Read a number
+	$readmemh("ui_txt/numbers/four.txt",four);						//Read a number
+	$readmemh("ui_txt/numbers/five.txt",five);						//Read a number
+	$readmemh("ui_txt/numbers/six.txt",six);						//Read a number
+	$readmemh("ui_txt/numbers/seven.txt",seven);						//Read a number
+	$readmemh("ui_txt/numbers/eight.txt",eight);						//Read a number
+	$readmemh("ui_txt/numbers/nine.txt",nine);						//Read a number
+	
+
+	$readmemh("ui_txt/letters/A.txt",letter_A);						//Read a number
+	$readmemh("ui_txt/letters/B.txt",letter_B);						//Read a number
+	$readmemh("ui_txt/letters/C.txt",letter_C);						//Read a number
+	$readmemh("ui_txt/letters/D.txt",letter_D);						//Read a number
+	$readmemh("ui_txt/letters/E.txt",letter_E);						//Read a number
+	$readmemh("ui_txt/letters/F.txt",letter_F);						//Read a number
+	$readmemh("ui_txt/letters/G.txt",letter_G);						//Read a number
+	$readmemh("ui_txt/letters/H.txt",letter_H);						//Read a number
+	$readmemh("ui_txt/letters/I.txt",letter_I);						//Read a number
+	$readmemh("ui_txt/letters/J.txt",letter_J);						//Read a number
+
+	$readmemh("ui_txt/messages/triangle_won.txt",triangle_won);						//messages
+	$readmemh("ui_txt/messages/circle_won.txt",circle_won);						//messages
+	$readmemh("ui_txt/messages/invalid_move.txt",invalid_move);						//messages
+
+	$readmemh("ui_txt/symbols/filled_circle.txt",filled_circle);						//Read a number
+
+	$readmemh("ui_txt/symbols/filled_circle_big.txt",filled_circle_big);						//Read numbers
+	$readmemh("ui_txt/symbols/empty_triangle_big.txt",empty_circle_big);						//Read numbers
+
+	$readmemh("ui_txt/symbols/filled_triangle.txt",filled_triangle);						//Read a number
+
+	$readmemh("ui_txt/symbols/empty_triangle_big.txt",empty_triangle_big);						//Read numbers
+
+	$readmemh("ui_txt/symbols/filled_triangle_big.txt",filled_triangle_big);						//Read numbers
+
+
+
+end
+
+
+always @(posedge vga_CLK)begin
+
+row <= POS_SYMBOL[7:4];
+column <= POS_SYMBOL[3:0];
+
+
+end
+
+// This always block is used to display the interface image, crucial and important.
+always @(posedge vga_CLK) begin
+
+	RGB <= ImageData[count_data];											//Send the current data to the top level design file
+
+	if(!pos_V) begin															//At start of each frame, zero the counters
+		count_data <= 0;
+		count_start <= 0;
+		loop_H <= 0;
+		loop_V <= 0;
+	end
+	
+	if(!pos_H) count_data <= count_start;
+	
+	if(ready) begin                   									//Due to double scaling, image displaying will end
+		if(!loop_V) begin  													//at the position that is twice of the width                    
+			loop_H <= ~loop_H;												//At each clock pulse, toggle the horizontal counter
+			
+			if(loop_H) count_data <= count_data + 1;					//When a pixel displayed twice, increment the data counter
+			
+			if(pos_H == (144 + 2*width - 1)) loop_V <= 1;			//At the end of each row of the image, toggle the 
+		end																		//vertical counter so that each row will be 
+		else begin																//displayed twice
+			loop_H <= ~loop_H;
+			
+			if(loop_H) count_data <= count_data + 1;
+			
+			if(pos_H == (144 + 2*width - 1)) begin
+				loop_V <= 0;													
+				count_start <= count_start + width;						//When a row displayed twice, increment the start count			
+			end																	//by the width of the product list image so that
+		end																		//the next row's data will start to be displayed 
+	end
+end
+
+
+// this always block is an example of how to display a number on the interface image. 22 stands for Y ,10 stands for length of the image similarly 94 stands for X and 10 stands for width of the image.
+always @(posedge vga_CLK) begin
+
+/*
+// 22 dikey koordinat 10 genişlik ve yükseklik image, 94 yatay koordinat
+if ( pos_V > (22) && pos_V < ((10+22)) && pos_H > (94) && pos_H < (94+10) )begin
+	ImageData[pos_H+(pos_V*320)] <= zero[ (pos_V-22)+(pos_H-94)*10];
+end
+*/
+
+
+//grid dolduran kod parçası aşağıda. sadece daire için.
+if ( pos_V > (22+(grid_width*column)) && pos_V < ((10+22+(grid_width*column))) && pos_H > (94+grid_width*(row)) && pos_H < (94+10+grid_width*(row)) )begin
+	ImageData[pos_H+(pos_V*320)] <= filled_circle[ (pos_V-(22+(grid_width*column)))+(pos_H-(94+grid_width*(row)))*10];
+end
+
+
+case(TURN)
+triangle_turn:begin
+
+
+	//Filled triangle big example.x=24 y=18 on 320x240 image (gets multiplied by 2 on the screen)
+	if ( pos_V > (18) && pos_V < ((33+18)) && pos_H > (24) && pos_H < (24+33) )begin
+		ImageData[pos_H+(pos_V*320)] <= filled_triangle_big[ (pos_V-17)+(pos_H-24)*34];
+	end
+
+	
+	//empty circle big example.x=268 y=18 on 320x240 image (gets multiplied by 2 on the screen)
+	if ( pos_V > (18) && pos_V < ((33+18)) && pos_H > (268) && pos_H < (268+33) )begin
+		ImageData[pos_H+(pos_V*320)] <= empty_circle_big[ (pos_V-17)+(pos_H-268)*34];
+	end
+    
+if ( pos_V > (24+(grid_width*column)) && pos_V < ((10+24+(grid_width*column))) && pos_H > (95+grid_width*(row)) && pos_H < (95+10+grid_width*(row)) )begin
+	ImageData[pos_H+(pos_V*320)] <= filled_triangle[ (pos_V-(24+(grid_width*column)))+(pos_H-(95+grid_width*(row)))*10];
+end
+
+end
+circle_turn:begin
+	
+
+	//Filled circle big example.x=268 y=18 on 320x240 image (gets multiplied by 2 on the screen)
+	if ( pos_V > (18) && pos_V < ((33+18)) && pos_H > (268) && pos_H < (268+33) )begin
+		ImageData[pos_H+(pos_V*320)] <= filled_circle_big[ (pos_V-17)+(pos_H-268)*34];
+	end
+
+	//empty triangle big example.x=24 y=17 on 320x240 image (gets multiplied by 2 on the screen)
+	if ( pos_V > (18) && pos_V < ((33+18)) && pos_H > (24) && pos_H < (24+33) )begin
+		ImageData[pos_H+(pos_V*320)] <= empty_circle_big[ (pos_V-17)+(pos_H-24)*34];
+	end
+
+    if ( pos_V > (24+(grid_width*column)) && pos_V < ((10+24+(grid_width*column))) && pos_H > (95+grid_width*(row)) && pos_H < (95+10+grid_width*(row)) )begin
+	ImageData[pos_H+(pos_V*320)] <= filled_circle[ (pos_V-(24+(grid_width*column)))+(pos_H-(95+grid_width*(row)))*10];
+end
+
+end
+
+endcase
+
+end
+
+
+endmodule
